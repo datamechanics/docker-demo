@@ -1,0 +1,57 @@
+image_name := 'gcr.io/dm-docker/python-spark-pi:dev'
+cluster_url := 'https://demo.datamechanics.co'
+api_key := 'null'
+
+# Build the image and push it to the registry
+update:
+    docker build -t {{image_name}} .
+    docker push {{image_name}}
+
+# Run locally with code auto-update
+run_locally +args='"10"':
+    docker run --mount type=bind,source="$(pwd)",target=/opt/application \
+        {{image_name}} driver local:///opt/application/pi.py {{args}}
+
+# Rebuild image and run locally
+run_registry_image_locally +args='"10"': update
+    docker run {{image_name}} driver local:///opt/application/pi.py {{args}}
+
+# Run on Data Mechanics
+run_cluster +args='"100"': update
+    #!/bin/bash
+    output=$(curl -s --request POST {{cluster_url}}/api/apps/ \
+        --header 'Content-Type: application/json' \
+        --header 'X-API-Key: {{api_key}}' \
+        --data-raw '{
+          "jobName": "python-spark-pi",
+          "configOverrides": {
+            "type": "Python",
+            "image": "{{image_name}}",
+            "imagePullPolicy": "Always",
+            "mainApplicationFile": "local:///opt/application/pi.py",
+            "arguments": [{{args}}]
+          }
+        }')
+    echo $output | jq -r
+    app_name=$(echo $output | jq -r '.appName')
+    just api_key={{api_key}} _stream_logs $app_name
+
+# Get the status of an app
+_get_app_state app_name:
+    @curl -s --request GET {{cluster_url}}/api/apps/{{app_name}} \
+        --header 'Content-Type: application/json' \
+        --header 'X-API-Key: {{api_key}}' | jq -r '.status.state'
+
+# Print the live driver log stream of an app
+_stream_logs app_name:
+    #!/bin/bash
+    app_state="null"
+    while [ "$app_state" = "null" -o "$app_state" = "SUBMITTED" -o "$app_state" = "" ]
+    do
+        app_state=$(just api_key={{api_key}} _get_app_state {{app_name}})
+        echo "App is in state $app_state, waiting..."
+        sleep 1
+    done
+    curl --request GET {{cluster_url}}/api/apps/{{app_name}}/live/driver-log \
+        --header 'Content-Type: application/json' \
+        --header 'X-API-Key: {{api_key}}'
