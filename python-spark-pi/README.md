@@ -1,8 +1,11 @@
 # Python Spark Pi Docker dev flow example
 
-This folder proposes an example of dev flow using Docker, as presented in https://docs.datamechanics.co/docs/packaging-code .
+This folder proposes an example of dev flow using Docker, as presented in https://docs.datamechanics.co/docs/packaging-code.
+
+It uses [`just`](https://github.com/casey/just) as a command runner (it's a simpler replacement for `make`).
 
 ```bash
+$ just --list
 Available recipes:
 run_cluster                 --  Run on Data Mechanics
 run_locally                 --  Run locally with code auto-update
