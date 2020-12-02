@@ -1,0 +1,6 @@
+image_name := 'gcr.io/dm-docker/demo/custom-notebook:dev'
+
+# Build the image and push it to the registry
+update:
+    docker build -t {{image_name}} .
+    docker push {{image_name}}
